@@ -1,0 +1,21 @@
+body {
+  background-color: #f4f6f9;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.bg-dark-sidebar {
+  background-color: #0b0f19 !important;
+  color: #94a3b8;
+}
+
+.sidebar-link {
+  color: #94a3b8;
+  text-decoration: none;
+  transition: all 0.2s ease-in-out;
+}
+
+.sidebar-link:hover, .sidebar-link.active {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
