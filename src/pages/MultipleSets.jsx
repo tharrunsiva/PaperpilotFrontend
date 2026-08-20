@@ -1,24 +1,40 @@
-import React, { useState } from 'react';
-import { Container, Row, Col, Card, Button, Form, Tabs, Tab, Table, Badge } from 'react-bootstrap';
+import React, { useState, useEffect } from 'react';
+import { Container, Row, Col, Card, Button, Form, Tabs, Tab, Table, Badge, Spinner } from 'react-bootstrap';
 import { Layers, Sparkles, Download } from 'lucide-react';
+import { generateMultipleSets } from '../services/api';
 
 function MultipleSets() {
   const [numSets, setNumSets] = useState(3);
   const [activeTab, setActiveTab] = useState('setA');
+  const [setsData, setSetsData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const setsData = {
-    setA: [
-      { qNum: 1, marks: 2, diff: 'Easy', text: 'Define normalization and describe the anomaly it prevents.' },
-      { qNum: 2, marks: 4, diff: 'Medium', text: 'Differentiate between 2NF and 3NF using an Employee relation.' },
-    ],
-    setB: [
-      { qNum: 1, marks: 2, diff: 'Easy', text: 'What is functional dependency? State Armstrong axioms.' },
-      { qNum: 2, marks: 4, diff: 'Medium', text: 'Explain Partial Dependency and Transitive Dependency with examples.' },
-    ],
-    setC: [
-      { qNum: 1, marks: 2, diff: 'Easy', text: 'State the primary purpose and objectives of BCNF decomposition.' },
-      { qNum: 2, marks: 4, diff: 'Medium', text: 'Differentiate between candidate keys and super keys with schemas.' },
-    ],
+  const fetchSets = async () => {
+    const savedExamId = localStorage.getItem('active_exam_id');
+    if (!savedExamId) {
+      alert("No active exam blueprint found. Please configure requirements and generate questions first.");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await generateMultipleSets({ exam_id: Number(savedExamId), num_sets: numSets });
+      setSetsData(response.data.sets);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to generate parallel sets: " + (err.response?.data?.detail || err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSets();
+  }, [numSets]);
+
+  const handleRebalance = (e) => {
+    e.preventDefault();
+    fetchSets();
   };
 
   return (
@@ -40,7 +56,7 @@ function MultipleSets() {
                 <option value="4">4 Sets (Set A, Set B, Set C, Set D)</option>
               </Form.Select>
             </Form.Group>
-            <Button variant="primary" size="sm" className="w-100 fw-bold">
+            <Button variant="primary" size="sm" className="w-100 fw-bold" onClick={handleRebalance}>
               <Sparkles size={14} className="me-1" /> Re-balance Sets
             </Button>
           </Card>
@@ -55,59 +71,45 @@ function MultipleSets() {
               </Button>
             </div>
 
-            <Tabs activeKey={activeTab} onSelect={(k) => setActiveTab(k)} className="mb-3">
-              <Tab eventKey="setA" title="Set A (Master)">
-                <Table responsive hover className="small align-middle">
-                  <thead className="table-light">
-                    <tr><th>Q#</th><th>Question Text</th><th>Marks</th><th>Difficulty</th></tr>
-                  </thead>
-                  <tbody>
-                    {setsData.setA.map((q) => (
-                      <tr key={q.qNum}>
-                        <td>Q{q.qNum}</td>
-                        <td className="fw-medium">{q.text}</td>
-                        <td>{q.marks}M</td>
-                        <td><Badge bg="success">{q.diff}</Badge></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              </Tab>
-              <Tab eventKey="setB" title="Set B (Parallel)">
-                <Table responsive hover className="small align-middle">
-                  <thead className="table-light">
-                    <tr><th>Q#</th><th>Question Text</th><th>Marks</th><th>Difficulty</th></tr>
-                  </thead>
-                  <tbody>
-                    {setsData.setB.map((q) => (
-                      <tr key={q.qNum}>
-                        <td>Q{q.qNum}</td>
-                        <td className="fw-medium">{q.text}</td>
-                        <td>{q.marks}M</td>
-                        <td><Badge bg="success">{q.diff}</Badge></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              </Tab>
-              <Tab eventKey="setC" title="Set C (Parallel)">
-                <Table responsive hover className="small align-middle">
-                  <thead className="table-light">
-                    <tr><th>Q#</th><th>Question Text</th><th>Marks</th><th>Difficulty</th></tr>
-                  </thead>
-                  <tbody>
-                    {setsData.setC.map((q) => (
-                      <tr key={q.qNum}>
-                        <td>Q{q.qNum}</td>
-                        <td className="fw-medium">{q.text}</td>
-                        <td>{q.marks}M</td>
-                        <td><Badge bg="success">{q.diff}</Badge></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              </Tab>
-            </Tabs>
+            {loading ? (
+              <div className="text-center py-5">
+                <Spinner animation="border" variant="primary" className="mb-2" />
+                <p className="text-muted mb-0">AI is drafting equivalent balanced sets...</p>
+              </div>
+            ) : setsData ? (
+              <Tabs activeKey={activeTab} onSelect={(k) => setActiveTab(k)} className="mb-3">
+                {Object.keys(setsData).map((setKey) => {
+                  const setName = setKey === 'setA' ? 'Set A (Master)' : `Set ${setKey.slice(-1).toUpperCase()} (Parallel)`;
+                  return (
+                    <Tab eventKey={setKey} title={setName} key={setKey}>
+                      <Table responsive hover className="small align-middle">
+                        <thead className="table-light">
+                          <tr><th>Q#</th><th>Question Text</th><th>Marks</th><th>Difficulty</th></tr>
+                        </thead>
+                        <tbody>
+                          {setsData[setKey].map((q) => (
+                            <tr key={q.qNum}>
+                              <td>Q{q.qNum}</td>
+                              <td className="fw-medium">{q.text}</td>
+                              <td>{q.marks}M</td>
+                              <td>
+                                <Badge bg={q.diff === 'Easy' ? 'success' : q.diff === 'Medium' ? 'warning' : 'danger'}>
+                                  {q.diff}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    </Tab>
+                  );
+                })}
+              </Tabs>
+            ) : (
+              <div className="text-center py-5 text-muted">
+                No sets generated. Click 'Re-balance Sets' to start.
+              </div>
+            )}
           </Card>
         </Col>
       </Row>

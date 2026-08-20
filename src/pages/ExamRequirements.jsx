@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Form, Button, Table, Alert, Badge } from 'react-bootstrap';
 import { ArrowRight, CheckCircle, Calculator } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { saveExamRequirements, getExamRequirements } from '../services/api';
 
 function ExamRequirements() {
   const navigate = useNavigate();
@@ -15,18 +16,76 @@ function ExamRequirements() {
   // Difficulty Distribution (%)
   const [difficulty, setDifficulty] = useState({ easy: 40, medium: 40, hard: 20 });
 
+  useEffect(() => {
+    const savedExamId = localStorage.getItem('active_exam_id');
+    if (savedExamId) {
+      const loadSavedRequirements = async () => {
+        try {
+          const res = await getExamRequirements(Number(savedExamId));
+          const exam = res.data;
+          if (exam) {
+            setExamName(exam.exam_title);
+            setDuration(exam.duration);
+            setCounts({
+              q2: exam.q2_count,
+              q4: exam.q4_count,
+              q7: exam.q7_count
+            });
+            setDifficulty({
+              easy: exam.easy_pct,
+              medium: exam.medium_pct,
+              hard: exam.hard_pct
+            });
+          }
+        } catch (err) {
+          console.error("Failed to load active blueprint requirements:", err);
+        }
+      };
+      loadSavedRequirements();
+    }
+  }, []);
+
   // Calculation
   const totalQuestions = Number(counts.q2) + Number(counts.q4) + Number(counts.q7);
   const calculatedMarks = Number(counts.q2) * 2 + Number(counts.q4) * 4 + Number(counts.q7) * 7;
   const diffTotal = Number(difficulty.easy) + Number(difficulty.medium) + Number(difficulty.hard);
 
-  const handleProceed = (e) => {
+  const handleProceed = async (e) => {
     e.preventDefault();
     if (diffTotal !== 100) {
       alert('Difficulty distribution percentages must add up to 100%');
       return;
     }
-    navigate('/generation');
+    
+    const syllabusId = localStorage.getItem('active_syllabus_id');
+    if (!syllabusId) {
+      alert('Please upload a syllabus in the Syllabus page first!');
+      navigate('/syllabus');
+      return;
+    }
+
+    const payload = {
+      subject_id: 1,
+      syllabus_id: Number(syllabusId),
+      exam_title: examName,
+      duration: duration,
+      total_marks: calculatedMarks,
+      q2_count: Number(counts.q2),
+      q4_count: Number(counts.q4),
+      q7_count: Number(counts.q7),
+      easy_pct: Number(difficulty.easy),
+      medium_pct: Number(difficulty.medium),
+      hard_pct: Number(difficulty.hard)
+    };
+
+    try {
+      const response = await saveExamRequirements(payload);
+      localStorage.setItem('active_exam_id', response.data.exam_id);
+      navigate('/generation');
+    } catch (error) {
+      console.error(error);
+      alert('Failed to save blueprint: ' + (error.response?.data?.detail || error.message));
+    }
   };
 
   return (

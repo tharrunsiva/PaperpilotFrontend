@@ -1,36 +1,70 @@
-import React, { useState } from 'react';
-import { Container, Row, Col, Card, Table, Badge, Button, Modal } from 'react-bootstrap';
-import { Download, Eye, Printer, FileCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Container, Row, Col, Card, Table, Badge, Button, Modal, Spinner } from 'react-bootstrap';
+import { Download, Eye, Printer } from 'lucide-react';
+import { getAllExams, getExamQuestions, downloadPaperPdf } from '../services/api';
 
 function GeneratedPapers() {
+  const [papers, setPapers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
+  const [previewQuestions, setPreviewQuestions] = useState([]);
+  const [previewExam, setPreviewExam] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
-  const papers = [
-    {
-      id: 'EXAM-2026-01',
-      subject: 'Database Management Systems',
-      title: 'Internal Assessment Test - I',
-      date: '2026-08-18',
-      marks: 75,
-      sets: 3,
-    },
-    {
-      id: 'EXAM-2026-02',
-      subject: 'Operating Systems',
-      title: 'Mid-Term Examination',
-      date: '2026-08-15',
-      marks: 100,
-      sets: 2,
-    },
-    {
-      id: 'EXAM-2026-03',
-      subject: 'Data Structures & Algorithms',
-      title: 'Semester Model Exam',
-      date: '2026-08-10',
-      marks: 75,
-      sets: 1,
-    },
-  ];
+  const fetchPapers = async () => {
+    setLoading(true);
+    try {
+      const res = await getAllExams();
+      setPapers(res.data);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to load papers: " + (err.response?.data?.detail || err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPapers();
+  }, []);
+
+  const handleDownload = async (examId) => {
+    try {
+      const res = await downloadPaperPdf(examId, true);
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = `exam_${examId}.pdf`;
+      link.click();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to download PDF: " + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleShowPreview = async (exam) => {
+    setPreviewExam(exam);
+    setShowPreview(true);
+    setPreviewLoading(true);
+    try {
+      const res = await getExamQuestions(exam.exam_id);
+      setPreviewQuestions(res.data);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to load questions for preview: " + (err.response?.data?.detail || err.message));
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Container className="p-4 text-center my-5">
+        <Spinner animation="border" variant="primary" />
+        <h5 className="mt-3">Loading generated papers repository...</h5>
+      </Container>
+    );
+  }
 
   return (
     <Container fluid className="p-4">
@@ -40,77 +74,119 @@ function GeneratedPapers() {
       </div>
 
       <Card className="border-0 shadow-sm p-4">
-        <Table responsive hover className="align-middle small">
-          <thead className="table-light">
-            <tr>
-              <th>Paper ID</th>
-              <th>Subject & Exam Title</th>
-              <th>Generated Date</th>
-              <th>Total Marks</th>
-              <th>Sets</th>
-              <th className="text-end">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {papers.map((p) => (
-              <tr key={p.id}>
-                <td className="fw-bold text-primary">{p.id}</td>
-                <td>
-                  <div className="fw-bold text-dark">{p.subject}</div>
-                  <small className="text-muted">{p.title}</small>
-                </td>
-                <td>{p.date}</td>
-                <td>{p.marks} Marks</td>
-                <td><Badge bg="secondary">{p.sets} Set(s)</Badge></td>
-                <td className="text-end">
-                  <Button variant="outline-secondary" size="sm" className="me-2" onClick={() => setShowPreview(true)}>
-                    <Eye size={13} className="me-1" /> Preview
-                  </Button>
-                  <Button variant="primary" size="sm">
-                    <Download size={13} className="me-1" /> Download PDF
-                  </Button>
-                </td>
+        {papers.length === 0 ? (
+          <div className="text-center py-5 text-muted">
+            No papers have been generated yet. Go to Blueprint page to configure and generate.
+          </div>
+        ) : (
+          <Table responsive hover className="align-middle small">
+            <thead className="table-light">
+              <tr>
+                <th>Paper ID</th>
+                <th>Subject & Exam Title</th>
+                <th>Generated Date</th>
+                <th>Total Marks</th>
+                <th>Sections</th>
+                <th className="text-end">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </Table>
+            </thead>
+            <tbody>
+              {papers.map((p) => (
+                <tr key={p.exam_id}>
+                  <td className="fw-bold text-primary">EXAM-{p.exam_id}</td>
+                  <td>
+                    <div className="fw-bold text-dark">Course Code: CS-{p.subject_id}</div>
+                    <small className="text-muted">{p.exam_title}</small>
+                  </td>
+                  <td>{p.exam_date}</td>
+                  <td>{p.total_marks} Marks</td>
+                  <td>
+                    <Badge bg="secondary" className="me-1">A: {p.q2_count}</Badge>
+                    <Badge bg="secondary" className="me-1">B: {p.q4_count}</Badge>
+                    <Badge bg="secondary">C: {p.q7_count}</Badge>
+                  </td>
+                  <td className="text-end">
+                    <Button variant="outline-secondary" size="sm" className="me-2" onClick={() => handleShowPreview(p)}>
+                      <Eye size={13} className="me-1" /> Preview
+                    </Button>
+                    <Button variant="primary" size="sm" onClick={() => handleDownload(p.exam_id)}>
+                      <Download size={13} className="me-1" /> Download PDF
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
       </Card>
 
       {/* Exam Paper Print Preview Modal */}
       <Modal show={showPreview} onHide={() => setShowPreview(false)} size="lg" centered>
         <Modal.Header closeButton>
-          <Modal.Title className="fs-5">Paper Preview - Database Management Systems</Modal.Title>
+          <Modal.Title className="fs-5">
+            Paper Preview - {previewExam?.exam_title || "Exam Paper"}
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body className="bg-light p-4">
-          <Card className="border p-4 bg-white shadow-sm font-monospace">
-            <div className="text-center border-bottom pb-3 mb-3">
-              <h5 className="fw-bold mb-1">ABC COLLEGE OF ENGINEERING</h5>
-              <h6 className="fw-semibold mb-1">DEPARTMENT OF COMPUTER SCIENCE & ENGINEERING</h6>
-              <p className="small mb-0">DATABASE MANAGEMENT SYSTEMS | TIME: 3 HOURS | MAX MARKS: 75</p>
+          {previewLoading ? (
+            <div className="text-center py-5">
+              <Spinner animation="border" variant="primary" />
+              <p className="mt-2 text-muted mb-0">Loading questions...</p>
             </div>
+          ) : (
+            <Card className="border p-4 bg-white shadow-sm font-monospace" style={{ pageBreakAfter: 'always' }}>
+              <div className="text-center border-bottom pb-3 mb-3">
+                <h5 className="fw-bold mb-1">SRI RAMAKRISHNA COLLEGE OF ARTS & SCIENCE</h5>
+                <h6 className="fw-semibold mb-1">DEPARTMENT OF COMPUTER SCIENCE</h6>
+                <p className="small mb-0">
+                  {previewExam?.exam_title?.toUpperCase()} | DURATION: {previewExam?.duration} | MAX MARKS: {previewExam?.total_marks}
+                </p>
+              </div>
 
-            <h6 className="fw-bold border-bottom pb-1">PART A (10 × 2 = 20 Marks)</h6>
-            <ol className="small ps-3 mb-3">
-              <li>Define the terms Data Independence and Physical Independence.</li>
-              <li>Differentiate between Candidate Key and Primary Key.</li>
-              <li>State the ACID properties in transaction processing.</li>
-            </ol>
+              {previewQuestions.filter(q => q.marks === 2).length > 0 && (
+                <>
+                  <h6 className="fw-bold border-bottom pb-1">
+                    SECTION A (2 Marks Each)
+                  </h6>
+                  <ol className="small ps-3 mb-3" start="1">
+                    {previewQuestions.filter(q => q.marks === 2).map((q) => (
+                      <li key={q.question_id} className="mb-2">{q.question_text}</li>
+                    ))}
+                  </ol>
+                </>
+              )}
 
-            <h6 className="fw-bold border-bottom pb-1">PART B (5 × 4 = 20 Marks)</h6>
-            <ol className="small ps-3 mb-3" start="11">
-              <li>Explain 3NF and BCNF with suitable relational schema violations.</li>
-              <li>Differentiate between clustered and non-clustered indexing techniques.</li>
-            </ol>
+              {previewQuestions.filter(q => q.marks === 4).length > 0 && (
+                <>
+                  <h6 className="fw-bold border-bottom pb-1 mt-3">
+                    SECTION B (4 Marks Each)
+                  </h6>
+                  <ol className="small ps-3 mb-3" start={previewQuestions.filter(q => q.marks === 2).length + 1}>
+                    {previewQuestions.filter(q => q.marks === 4).map((q) => (
+                      <li key={q.question_id} className="mb-2">{q.question_text}</li>
+                    ))}
+                  </ol>
+                </>
+              )}
 
-            <h6 className="fw-bold border-bottom pb-1">PART C (5 × 7 = 35 Marks)</h6>
-            <ol className="small ps-3" start="16">
-              <li>Given a relation R(A, B, C, D, E) with functional dependencies, compute candidate keys and normalize to 3NF.</li>
-            </ol>
-          </Card>
+              {previewQuestions.filter(q => q.marks === 7).length > 0 && (
+                <>
+                  <h6 className="fw-bold border-bottom pb-1 mt-3">
+                    SECTION C (7 Marks Each)
+                  </h6>
+                  <ol className="small ps-3 mb-3" start={previewQuestions.filter(q => q.marks === 2).length + previewQuestions.filter(q => q.marks === 4).length + 1}>
+                    {previewQuestions.filter(q => q.marks === 7).map((q) => (
+                      <li key={q.question_id} className="mb-2">{q.question_text}</li>
+                    ))}
+                  </ol>
+                </>
+              )}
+            </Card>
+          )}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" size="sm" onClick={() => setShowPreview(false)}>Close</Button>
-          <Button variant="primary" size="sm"><Printer size={13} className="me-1" /> Print Paper</Button>
+          <Button variant="primary" size="sm" onClick={() => window.print()}><Printer size={13} className="me-1" /> Print Paper</Button>
         </Modal.Footer>
       </Modal>
     </Container>

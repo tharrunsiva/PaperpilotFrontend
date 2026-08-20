@@ -1,13 +1,34 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navbar, Container, Badge, Image } from 'react-bootstrap';
 import { Bell } from 'lucide-react';
 
 function Header() {
+  const [facultyName, setFacultyName] = useState('Dr. Priya Sharma');
+
+  useEffect(() => {
+    const savedName = localStorage.getItem('faculty_name');
+    if (savedName) {
+      setFacultyName(savedName);
+    }
+
+    const handleStorageChange = () => {
+      const updatedName = localStorage.getItem('faculty_name');
+      if (updatedName) {
+        setFacultyName(updatedName);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
   return (
     <Navbar bg="white" className="px-4 py-3 border-bottom shadow-sm">
       <Container fluid className="px-0">
         <div>
-          <h4 className="fw-bold mb-0 text-dark">Welcome back, Teacher! 👋</h4>
+          <h4 className="fw-bold mb-0 text-dark">Welcome back, {facultyName}! 👋</h4>
           <p className="text-muted small mb-0">Create balanced, syllabus-based question papers in minutes with AI.</p>
         </div>
 
@@ -30,7 +51,7 @@ function Header() {
               className="object-fit-cover"
             />
             <div className="text-start">
-              <h6 className="mb-0 fw-bold fs-6">Dr. Priya Sharma</h6>
+              <h6 className="mb-0 fw-bold fs-6">{facultyName}</h6>
               <small className="text-muted" style={{ fontSize: '11px' }}>Administrator</small>
             </div>
           </div>

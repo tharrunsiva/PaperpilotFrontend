@@ -16,6 +16,9 @@ export const uploadSyllabusFile = (formData) =>
 export const getExtractedSyllabus = (subjectId) =>
   API.get(`/syllabus/${subjectId}/units`);
 
+export const getAllSyllabi = () =>
+  API.get('/syllabus');
+
 // Exam Requirements Endpoints
 export const saveExamRequirements = (payload) =>
   API.post('/requirements', payload);
@@ -36,8 +39,21 @@ export const approveQuestion = (questionId) =>
 export const generateMultipleSets = (payload) =>
   API.post('/generation/generate-sets', payload);
 
-// PDF Export Endpoint
-export const downloadPaperPdf = (examId) =>
-  API.get(`/pdf/export/${examId}`, { responseType: 'blob' });
+// PDF Export Endpoints
+export const downloadPaperPdf = (examId, allQuestions = false) =>
+  API.get(`/pdf/export/${examId}${allQuestions ? '?all_questions=true' : ''}`, { responseType: 'blob' });
+
+export const downloadQuestionBankPdf = () =>
+  API.get('/pdf/export-bank', { responseType: 'blob' });
+
+// Extra endpoints
+export const getExamQuestions = (examId) =>
+  API.get(`/generation/questions/${examId}`);
+
+export const getAllExams = () =>
+  API.get('/requirements');
+
+export const getQuestionBank = () =>
+  API.get('/question-bank');
 
 export default API;

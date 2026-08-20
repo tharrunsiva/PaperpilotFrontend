@@ -1,55 +1,95 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Form, ProgressBar, Accordion, Badge } from 'react-bootstrap';
 import { UploadCloud, FileText, CheckCircle2, RefreshCw } from 'lucide-react';
+import { uploadSyllabusFile } from '../services/api';
 
 function SyllabusManagement() {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [parsedData, setParsedData] = useState([
-    {
-      unit: 1,
-      name: 'Introduction to Database Systems',
-      weightage: 20,
-      topics: ['Database System Concepts & Architecture', 'Data Models & Schemas', 'DBMS Languages & Interfaces'],
-    },
-    {
-      unit: 2,
-      name: 'Relational Data Model & SQL',
-      weightage: 20,
-      topics: ['Relational Model Constraints', 'Relational Algebra', 'SQL DDL, DML, DCL', 'Nested Queries & Joins'],
-    },
-    {
-      unit: 3,
-      name: 'Database Design & Normalization',
-      weightage: 25,
-      topics: ['Functional Dependencies', '1NF, 2NF, 3NF Normal Forms', 'Boyce-Codd Normal Form (BCNF)', 'Multi-Valued Dependencies'],
-    },
-    {
-      unit: 4,
-      name: 'Transaction Processing & Concurrency',
-      weightage: 20,
-      topics: ['ACID Properties', 'Schedules & Serializability', 'Lock-Based Concurrency Protocols', 'Deadlock Handling'],
-    },
-    {
-      unit: 5,
-      name: 'Indexing & Storage',
-      weightage: 15,
-      topics: ['File Organization', 'B-Trees and B+ Tree Indexing', 'Static & Dynamic Hashing'],
-    },
-  ]);
+  const [parsedData, setParsedData] = useState([]);
 
-  const handleFileUpload = (e) => {
+  useEffect(() => {
+    const savedUnits = localStorage.getItem('active_syllabus_units');
+    if (savedUnits) {
+      try {
+        const units = JSON.parse(savedUnits);
+        setParsedData(units.map((u, i) => ({
+          unit: u.unit_number || (i + 1),
+          name: u.unit_name,
+          weightage: u.weightage,
+          topics: u.topics || []
+        })));
+      } catch (err) {
+        console.error("Error loading cached units:", err);
+      }
+    } else {
+      // Fallback/Default mock preview if none is uploaded yet
+      setParsedData([
+        {
+          unit: 1,
+          name: 'Introduction to Database Systems',
+          weightage: 20,
+          topics: ['Database System Concepts & Architecture', 'Data Models & Schemas', 'DBMS Languages & Interfaces'],
+        },
+        {
+          unit: 2,
+          name: 'Relational Data Model & SQL',
+          weightage: 20,
+          topics: ['Relational Model Constraints', 'Relational Algebra', 'SQL DDL, DML, DCL', 'Nested Queries & Joins'],
+        },
+        {
+          unit: 3,
+          name: 'Database Design & Normalization',
+          weightage: 25,
+          topics: ['Functional Dependencies', '1NF, 2NF, 3NF Normal Forms', 'Boyce-Codd Normal Form (BCNF)', 'Multi-Valued Dependencies'],
+        },
+        {
+          unit: 4,
+          name: 'Transaction Processing & Concurrency',
+          weightage: 20,
+          topics: ['ACID Properties', 'Schedules & Serializability', 'Lock-Based Concurrency Protocols', 'Deadlock Handling'],
+        },
+        {
+          unit: 5,
+          name: 'Indexing & Storage',
+          weightage: 15,
+          topics: ['File Organization', 'B-Trees and B+ Tree Indexing', 'Static & Dynamic Hashing'],
+        },
+      ]);
+    }
+  }, []);
+
+  const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setUploading(true);
-    setProgress(20);
+    setProgress(30);
 
-    // Simulate OCR & AI parsing timeline
-    setTimeout(() => setProgress(60), 1000);
-    setTimeout(() => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await uploadSyllabusFile(formData);
       setProgress(100);
       setUploading(false);
-    }, 2000);
+      const units = response.data.units;
+      const syllabusId = response.data.syllabus_id;
+      
+      setParsedData(units.map((u, i) => ({
+        unit: u.unit_number || (i + 1),
+        name: u.unit_name,
+        weightage: u.weightage,
+        topics: u.topics || []
+      })));
+      
+      localStorage.setItem('active_syllabus_id', syllabusId);
+      localStorage.setItem('active_syllabus_units', JSON.stringify(units));
+    } catch (error) {
+      console.error(error);
+      alert('Failed to upload and parse syllabus: ' + (error.response?.data?.detail || error.message));
+      setUploading(false);
+      setProgress(0);
+    }
   };
 
   return (

@@ -1,78 +1,110 @@
-import React, { useState } from 'react';
-import { Container, Row, Col, Card, Button, Stack, ProgressBar, Badge } from 'react-bootstrap';
+import React, { useState, useEffect } from 'react';
+import { Container, Row, Col, Card, Button, Stack, ProgressBar, Badge, Spinner } from 'react-bootstrap';
 import { Sparkles, Download, CheckCircle, RefreshCw } from 'lucide-react';
 import QuestionReviewCard from '../components/review/QuestionReviewCard';
 import { useNavigate } from 'react-router-dom';
+import { 
+  getExamQuestions, 
+  generateQuestionSlots, 
+  approveQuestion, 
+  regenerateSingleQuestion, 
+  downloadPaperPdf 
+} from '../services/api';
 
 function QuestionGeneration() {
   const navigate = useNavigate();
   const [generating, setGenerating] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [questions, setQuestions] = useState([]);
+  const [examId, setExamId] = useState(null);
 
-  const [questions, setQuestions] = useState([
-    {
-      id: 1,
-      slotNumber: 1,
-      unit: 1,
-      marks: 2,
-      difficulty: 'Easy',
-      bloomLevel: 'Remember',
-      topic: 'DBMS Architecture',
-      text: 'Define the terms Data Independence and distinguish between logical and physical independence.',
-      isApproved: true,
-    },
-    {
-      id: 2,
-      slotNumber: 2,
-      unit: 2,
-      marks: 2,
-      difficulty: 'Easy',
-      bloomLevel: 'Understand',
-      topic: 'Keys',
-      text: 'Differentiate between a Candidate Key and a Super Key with a suitable relation example.',
-      isApproved: false,
-    },
-    {
-      id: 3,
-      slotNumber: 3,
-      unit: 3,
-      marks: 4,
-      difficulty: 'Medium',
-      bloomLevel: 'Apply',
-      topic: 'Normalization',
-      text: 'Explain 3NF and BCNF with functional dependencies that violate 3NF but satisfy 2NF.',
-      isApproved: false,
-      warning: 'Ensure student examples test multi-attribute candidate keys.',
-    },
-    {
-      id: 4,
-      slotNumber: 4,
-      unit: 4,
-      marks: 7,
-      difficulty: 'Hard',
-      bloomLevel: 'Analyze',
-      topic: 'Concurrency Control',
-      text: 'Given the following concurrent transaction schedules, test for Conflict Serializability by constructing the Precedence Graph.',
-      isApproved: false,
-    },
-  ]);
-
-  const handleApprove = (id) => {
-    setQuestions(questions.map((q) => (q.id === id ? { ...q, isApproved: !q.isApproved } : q)));
+  const fetchQuestions = async (id) => {
+    try {
+      setLoading(true);
+      const res = await getExamQuestions(id);
+      if (res.data.length === 0) {
+        // Trigger auto-generation since slots are empty
+        setGenerating(true);
+        const genRes = await generateQuestionSlots({ exam_id: id });
+        const res2 = await getExamQuestions(id);
+        setQuestions(res2.data.map(q => ({
+          id: q.question_id,
+          slotNumber: q.slot_number,
+          unit: q.unit_id,
+          marks: q.marks,
+          difficulty: q.difficulty,
+          bloomLevel: q.bloom_level,
+          topic: "Syllabus Concept",
+          text: q.question_text,
+          isApproved: q.is_approved,
+          warning: q.warning_msg
+        })));
+      } else {
+        setQuestions(res.data.map(q => ({
+          id: q.question_id,
+          slotNumber: q.slot_number,
+          unit: q.unit_id,
+          marks: q.marks,
+          difficulty: q.difficulty,
+          bloomLevel: q.bloom_level,
+          topic: "Syllabus Concept",
+          text: q.question_text,
+          isApproved: q.is_approved,
+          warning: q.warning_msg
+        })));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error loading questions: " + (err.response?.data?.detail || err.message));
+    } finally {
+      setLoading(false);
+      setGenerating(false);
+    }
   };
 
-  const handleRegenerate = (id) => {
-    setQuestions(
-      questions.map((q) =>
+  useEffect(() => {
+    const savedExamId = localStorage.getItem('active_exam_id');
+    if (!savedExamId) {
+      alert("No active exam blueprint found. Please create one first.");
+      navigate('/requirements');
+      return;
+    }
+    setExamId(Number(savedExamId));
+    fetchQuestions(Number(savedExamId));
+  }, []);
+
+  const handleApprove = async (id) => {
+    try {
+      await approveQuestion(id);
+      setQuestions(questions.map((q) => (q.id === id ? { ...q, isApproved: !q.isApproved } : q)));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update approval status: " + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleRegenerate = async (id) => {
+    try {
+      // Temporarily mark as regenerating or loading
+      setQuestions(questions.map(q => q.id === id ? { ...q, text: "Regenerating..." } : q));
+      const res = await regenerateSingleQuestion(id, {});
+      const updated = res.data;
+      setQuestions(questions.map((q) =>
         q.id === id
           ? {
               ...q,
-              text: `[Regenerated] Analyze the role of ${q.topic} in preserving data consistency across multi-tier setups.`,
+              text: updated.question_text,
+              bloomLevel: updated.bloom_level,
+              warning: updated.warning_msg,
               isApproved: false,
             }
           : q
-      )
-    );
+      ));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to regenerate question: " + (err.response?.data?.detail || err.message));
+    }
   };
 
   const handleDelete = (id) => {
@@ -83,7 +115,46 @@ function QuestionGeneration() {
     setQuestions(questions.map((q) => (q.id === id ? { ...q, text: newText } : q)));
   };
 
+  const handleRegenerateAll = async () => {
+    if (!window.confirm("Are you sure you want to regenerate all questions? This will replace current questions.")) {
+      return;
+    }
+    setGenerating(true);
+    try {
+      await generateQuestionSlots({ exam_id: examId });
+      await fetchQuestions(examId);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to regenerate all: " + (err.response?.data?.detail || err.message));
+      setGenerating(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    try {
+      const res = await downloadPaperPdf(examId);
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = `exam_${examId}.pdf`;
+      link.click();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to download PDF: " + (err.response?.data?.detail || err.message));
+    }
+  };
+
   const approvedCount = questions.filter((q) => q.isApproved).length;
+
+  if (loading || generating) {
+    return (
+      <Container className="p-4 text-center my-5">
+        <Spinner animation="border" variant="primary" className="mb-3" />
+        <h5>{generating ? "Gemini AI is generating question slots..." : "Loading examination blueprint..."}</h5>
+        <p className="text-muted">This may take a few seconds as concepts are mapped and balanced.</p>
+      </Container>
+    );
+  }
 
   return (
     <Container fluid className="p-4">
@@ -93,13 +164,13 @@ function QuestionGeneration() {
           <p className="text-muted small mb-0">Review, modify, or regenerate individual slot questions generated from your syllabus.</p>
         </div>
         <Stack direction="horizontal" gap={2}>
-          <Button variant="outline-primary" size="sm" onClick={() => setGenerating(true)}>
+          <Button variant="outline-primary" size="sm" onClick={handleRegenerateAll}>
             <RefreshCw size={14} className="me-1" /> Regenerate All
           </Button>
           <Button
             variant="success"
             size="sm"
-            onClick={() => navigate('/generated-papers')}
+            onClick={handleDownloadPdf}
             disabled={approvedCount === 0}
           >
             <Download size={14} className="me-1" /> Finalize & Export PDF ({approvedCount}/{questions.length})

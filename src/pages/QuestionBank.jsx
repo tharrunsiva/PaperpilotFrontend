@@ -1,18 +1,47 @@
-import React, { useState } from 'react';
-import { Container, Row, Col, Card, Table, Badge, Form, InputGroup, Button } from 'react-bootstrap';
-import { Search, Filter, Plus, BookOpen } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Container, Row, Col, Card, Table, Badge, Form, InputGroup, Button, Spinner } from 'react-bootstrap';
+import { Search, Filter, Plus, BookOpen, Download } from 'lucide-react';
+import { getQuestionBank, downloadQuestionBankPdf } from '../services/api';
 
 function QuestionBank() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUnit, setSelectedUnit] = useState('All');
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const questionBankData = [
-    { id: 101, unit: 1, marks: 2, difficulty: 'Easy', text: 'Define DDL and DML with two examples each.', subject: 'DBMS' },
-    { id: 102, unit: 2, marks: 4, difficulty: 'Medium', text: 'Explain the difference between Natural Join and Outer Join.', subject: 'DBMS' },
-    { id: 103, unit: 3, marks: 7, difficulty: 'Hard', text: 'Perform schema normalization up to BCNF for a given student registration relation.', subject: 'DBMS' },
-    { id: 104, unit: 4, marks: 4, difficulty: 'Medium', text: 'Describe Two-Phase Locking (2PL) protocol and its role in preventing non-serial schedules.', subject: 'DBMS' },
-    { id: 105, unit: 5, marks: 2, difficulty: 'Easy', text: 'What is dense indexing and how is it different from sparse indexing?', subject: 'DBMS' },
-  ];
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      try {
+        const res = await getQuestionBank();
+        setQuestions(res.data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchQuestions();
+  }, []);
+
+  const handleDownloadBank = async () => {
+    try {
+      const res = await downloadQuestionBankPdf();
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = 'question_bank.pdf';
+      link.click();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to download PDF: " + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const filteredQuestions = questions.filter((q) => {
+    const matchesSearch = (q.question_text || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesUnit = selectedUnit === 'All' || String(q.unit_id) === selectedUnit;
+    return matchesSearch && matchesUnit;
+  });
 
   return (
     <Container fluid className="p-4">
@@ -21,9 +50,14 @@ function QuestionBank() {
           <h4 className="fw-bold mb-1 text-dark">Central Question Bank</h4>
           <p className="text-muted small mb-0">Browse and search validated repository questions across past exams.</p>
         </div>
-        <Button variant="primary" size="sm">
-          <Plus size={14} className="me-1" /> Add Custom Question
-        </Button>
+        <div className="d-flex gap-2">
+          <Button variant="outline-primary" size="sm" onClick={handleDownloadBank}>
+            <Download size={14} className="me-1" /> Download PDF
+          </Button>
+          <Button variant="primary" size="sm">
+            <Plus size={14} className="me-1" /> Add Custom Question
+          </Button>
+        </div>
       </div>
 
       <Card className="border-0 shadow-sm p-4">
@@ -63,25 +97,33 @@ function QuestionBank() {
         </Row>
 
         {/* Question Bank Table */}
-        <Table responsive hover className="align-middle">
-          <thead className="table-light small">
-            <tr>
-              <th>ID</th>
-              <th>Question</th>
-              <th>Unit</th>
-              <th>Marks</th>
-              <th>Difficulty</th>
-              <th className="text-end">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="small">
-            {questionBankData
-              .filter((q) => q.text.toLowerCase().includes(searchTerm.toLowerCase()))
-              .map((q) => (
-                <tr key={q.id}>
-                  <td className="text-muted">#{q.id}</td>
-                  <td className="fw-medium text-dark">{q.text}</td>
-                  <td><Badge bg="primary">Unit {q.unit}</Badge></td>
+        {loading ? (
+          <div className="text-center py-5">
+            <Spinner animation="border" variant="primary" className="mb-2" />
+            <p className="text-muted mb-0">Loading questions from bank...</p>
+          </div>
+        ) : filteredQuestions.length === 0 ? (
+          <div className="text-center py-5 text-muted">
+            No questions found matching your criteria.
+          </div>
+        ) : (
+          <Table responsive hover className="align-middle">
+            <thead className="table-light small">
+              <tr>
+                <th>ID</th>
+                <th>Question</th>
+                <th>Unit</th>
+                <th>Marks</th>
+                <th>Difficulty</th>
+                <th className="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="small">
+              {filteredQuestions.map((q) => (
+                <tr key={q.question_id}>
+                  <td className="text-muted">#{q.question_id}</td>
+                  <td className="fw-medium text-dark">{q.question_text}</td>
+                  <td><Badge bg="primary">Unit {q.unit_id}</Badge></td>
                   <td>{q.marks}M</td>
                   <td>
                     <Badge bg={q.difficulty === 'Easy' ? 'success' : q.difficulty === 'Medium' ? 'warning' : 'danger'}>
@@ -89,14 +131,15 @@ function QuestionBank() {
                     </Badge>
                   </td>
                   <td className="text-end">
-                    <Button variant="link" size="sm" className="text-primary p-0 text-decoration-none">
-                      Use in Paper
+                    <Button variant="link" size="sm" className="text-primary p-0 text-decoration-none" disabled>
+                      In Use
                     </Button>
                   </td>
                 </tr>
               ))}
-          </tbody>
-        </Table>
+            </tbody>
+          </Table>
+        )}
       </Card>
     </Container>
   );
