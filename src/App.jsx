@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Sidebar from './components/common/Sidebar';
 import Header from './components/common/Header';
@@ -15,13 +15,31 @@ import ProfileSettings from './pages/ProfileSettings';
 import Notifications from './pages/Notifications';
 import HelpSupport from './pages/HelpSupport';
 
+import { Offcanvas } from 'react-bootstrap';
+
 function App() {
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+
   return (
     <Router>
       <div className="d-flex" style={{ minHeight: '100vh', backgroundColor: '#f4f6f9' }}>
-        <Sidebar />
+        {/* Desktop Sidebar (Hidden on mobile) */}
+        <Sidebar className="d-none d-md-flex position-sticky top-0" />
+
+        {/* Mobile Sidebar (Offcanvas - Hidden on desktop) */}
+        <Offcanvas 
+          show={showMobileSidebar} 
+          onHide={() => setShowMobileSidebar(false)} 
+          className="d-md-none bg-dark-sidebar"
+          style={{ width: '280px' }}
+        >
+          <Offcanvas.Body className="p-0 bg-dark-sidebar">
+            <Sidebar onLinkClick={() => setShowMobileSidebar(false)} />
+          </Offcanvas.Body>
+        </Offcanvas>
+
         <div className="flex-grow-1 d-flex flex-column" style={{ minWidth: 0 }}>
-          <Header />
+          <Header onToggleSidebar={() => setShowMobileSidebar(true)} />
           <main className="flex-grow-1">
             <Routes>
               <Route path="/" element={<Dashboard />} />

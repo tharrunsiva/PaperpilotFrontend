@@ -15,7 +15,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 
-function Sidebar() {
+function Sidebar({ className = '', onLinkClick }) {
   const menuItems = [
     { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={18} /> },
     { name: 'Syllabus Management', path: '/syllabus', icon: <FileSpreadsheet size={18} /> },
@@ -31,7 +31,7 @@ function Sidebar() {
 
   return (
     <div
-      className="bg-dark-sidebar d-flex flex-column p-3 vh-100 position-sticky top-0"
+      className={`bg-dark-sidebar d-flex flex-column p-3 vh-100 ${className}`}
       style={{ width: '280px', minWidth: '280px' }}
     >
       {/* Brand Header */}
@@ -53,6 +53,7 @@ function Sidebar() {
           <NavLink
             key={index}
             to={item.path}
+            onClick={onLinkClick}
             className={({ isActive }) =>
               `sidebar-link d-flex align-items-center justify-content-between px-3 py-2 text-decoration-none ${
                 isActive ? 'active text-white' : 'text-secondary'

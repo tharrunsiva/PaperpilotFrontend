@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Navbar, Container, Badge, Image } from 'react-bootstrap';
-import { Bell } from 'lucide-react';
+import { Navbar, Container, Badge, Image, Button } from 'react-bootstrap';
+import { Bell, Menu } from 'lucide-react';
 
-function Header() {
-  const [facultyName, setFacultyName] = useState('Dr. Priya Sharma');
+function Header({ onToggleSidebar }) {
+  const [facultyName, setFacultyName] = useState('Tharrun');
 
   useEffect(() => {
     const savedName = localStorage.getItem('faculty_name');
@@ -26,10 +26,21 @@ function Header() {
 
   return (
     <Navbar bg="white" className="px-4 py-3 border-bottom shadow-sm">
-      <Container fluid className="px-0">
-        <div>
-          <h4 className="fw-bold mb-0 text-dark">Welcome back, {facultyName}! 👋</h4>
-          <p className="text-muted small mb-0">Create balanced, syllabus-based question papers in minutes with AI.</p>
+      <Container fluid className="px-0 flex-nowrap">
+        <div className="d-flex align-items-center">
+          {/* Hamburger Toggler Button (Mobile Only) */}
+          <Button 
+            variant="link" 
+            className="d-md-none p-0 me-3 text-dark border-0 shadow-none" 
+            onClick={onToggleSidebar}
+          >
+            <Menu size={24} />
+          </Button>
+          
+          <div>
+            <h4 className="fw-bold mb-0 text-dark fs-5">Welcome back, {facultyName}! 👋</h4>
+            <p className="text-muted small mb-0 d-none d-sm-block">Create balanced, syllabus-based question papers in minutes with AI.</p>
+          </div>
         </div>
 
         <div className="d-flex align-items-center gap-3">

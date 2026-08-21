@@ -3,9 +3,9 @@ import { Container, Row, Col, Card, Form, Button } from 'react-bootstrap';
 
 function ProfileSettings() {
   const [profile, setProfile] = useState({
-    name: 'Dr. Priya Sharma',
-    email: 'priya.sharma@college.edu',
-    designation: 'Associate Professor & Exam Coordinator'
+    name: 'Tharrun',
+    email: 'tharrun@college.edu',
+    designation: 'Assistant Professor & Exam Coordinator'
   });
 
   const [settings, setSettings] = useState({
@@ -20,9 +20,9 @@ function ProfileSettings() {
     const savedDesignation = localStorage.getItem('faculty_designation');
     if (savedName || savedEmail || savedDesignation) {
       setProfile({
-        name: savedName || 'Dr. Priya Sharma',
-        email: savedEmail || 'priya.sharma@college.edu',
-        designation: savedDesignation || 'Associate Professor & Exam Coordinator'
+        name: savedName || 'Tharrun',
+        email: savedEmail || 'tharrun@college.edu',
+        designation: savedDesignation || 'Assistant Professor & Exam Coordinator'
       });
     }
 
